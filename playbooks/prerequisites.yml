@@ -1,0 +1,41 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+  - name: Disabling Swap on all nodes
+    command: swapoff -a
+
+  - name: Commenting Swap entries in /etc/fstab
+    replace:
+      path: /etc/fstab
+      regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+      replace: '# \1'
+    notify:
+    - Reload systemd units
+
+  - name: Create /etc/hosts
+    template:
+      src: hosts.j2
+      dest: /etc/hosts
+
+  # prevent frequent disconnects from idle connection
+  - name: Update ClientAliveInterval in sshd_config
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^ClientAliveInterval'
+      insertafter: '^#ClientAliveInterval '
+      line: 'ClientAliveInterval 180'
+    notify:
+    - Reload services
+
+  handlers:
+  - name: Reload systemd units
+    systemd:
+      daemon_reload: yes
+
+  - name: Reload services
+    service:
+      name: "{{ item }}"
+      state: reloaded
+    loop:
+    - sshd
