@@ -1,0 +1,8 @@
+---
+- hosts: all
+  gather_facts: no
+  # ssh-keygen must run one host at a time
+  serial: 1
+  tasks:
+  - name: Remove host keys from known_host
+    local_action: command ssh-keygen -R {{ ansible_host }}

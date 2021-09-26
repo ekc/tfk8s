@@ -78,9 +78,9 @@ resource "null_resource" "clusters" {
     }
   }
 
-  #  provisioner "local-exec" {
-  #    command = "sleep 5;ansible-playbook setup.yml"
-  #  }
+  provisioner "local-exec" {
+    command = "sleep 5;ansible-playbook setup.yml"
+  }
 
   provisioner "local-exec" {
     when = destroy

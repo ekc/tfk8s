@@ -1,0 +1,14 @@
+---
+- hosts: workers
+  become: yes
+  vars_files:
+  - vars/kubeadm_settings
+  tasks:
+  - name: Copying token to worker nodes
+    copy: src={{ token_file }} dest=join_token
+
+  - name: Joining worker nodes with kubernetes master
+    shell: |
+      kubeadm reset -f
+      tail -2 join_token > out.sh
+      sh out.sh

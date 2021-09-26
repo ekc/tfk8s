@@ -1,0 +1,45 @@
+---
+- hosts: masters
+  become: yes
+  vars_files:
+  - vars/kubeadm_settings
+  tasks:
+  - name: Pulling images required for setting up a Kubernetes cluster
+    command: kubeadm config images pull
+
+  - name: Resetting kubeadm
+    command: kubeadm reset -f
+    register: output
+
+  - name: Initializing Kubernetes cluster
+    command: kubeadm init --apiserver-advertise-address {{ad_addr}} --pod-network-cidr={{cidr_v}} --cri-socket /var/run/dockershim.sock
+    register: output
+
+  - name: Storing Logs and Generated token for future purpose.
+    local_action: copy content={{ output.stdout }} dest={{ token_file }}
+    become: False
+
+  - name: Create $HOME/.kube
+    file:
+      path: "{{ ansible_env['HOME'] }}/.kube"
+      state: directory
+      mode: '0755'
+
+  - name: Copy kube config file
+    copy:
+      src: /etc/kubernetes/admin.conf
+      dest: "{{ ansible_env['HOME'] }}/.kube/config"
+      remote_src: yes
+      mode: '0600'
+
+  - name: Install Network Add-on
+    command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+  - name: Capture the output of kubectl completion bash
+    command: kubectl completion bash
+    register: output
+
+  - name: Create bash completion script for kubectl
+    copy:
+      content: "{{ output.stdout }}"
+      dest: /etc/bash_completion.d/kubectl
