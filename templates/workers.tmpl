@@ -1,0 +1,4 @@
+[workers]
+%{ for hostname, ipaddress in hostipmap ~}
+${hostname} ansible_host=${ipaddress}
+%{ endfor ~}
