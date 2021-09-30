@@ -20,53 +20,40 @@ resource "digitalocean_droplet" "workers" {
   count = var.settings["number_of_workers"]
 }
 
-resource "null_resource" "masters" {
-  triggers = {
-    masters_ids = join(",", digitalocean_droplet.masters.*.id)
-  }
-
-  provisioner "local-exec" {
-    command = "echo \"$content\" > ${path.module}/inventory/masters"
-    environment = {
-      content = templatefile("${path.module}/templates/masters.tmpl",{
-        hostipmap = {
-          for key in digitalocean_droplet.masters.*: key.name => key.ipv4_address
-        }
-      })
+resource "local_file" "masters" {
+  depends_on = [ digitalocean_droplet.masters ]
+  filename = "${path.module}/inventory/masters"
+  content = templatefile("${path.module}/templates/masters.tmpl",{
+    hostipmap = {
+      for key in digitalocean_droplet.masters.*: key.name => key.ipv4_address
     }
-  }
-
-  provisioner "local-exec" {
-    command = "echo \"$content\" > ${path.module}/playbooks/vars/kubeadm_settings"
-    environment = {
-      content = templatefile("${path.module}/templates/kubeadm.tmpl",{
-        ad_addr = digitalocean_droplet.masters.ipv4_address_private
-      })
-    }
-  }
+  })
 }
 
-resource "null_resource" "workers" {
-  triggers = {
-    worker_ids = join(",", digitalocean_droplet.workers.*.id)
-  }
-
-  provisioner "local-exec" {
-    command = "echo \"$content\" > ${path.module}/inventory/workers"
-    environment = {
-      content = templatefile("${path.module}/templates/workers.tmpl",{
-        hostipmap = {
-          for key in digitalocean_droplet.workers.*: key.name => key.ipv4_address
-        }
-      })
-    }
-  }
+resource "local_file" "kubeadm_settings" {
+  depends_on = [ digitalocean_droplet.masters, local_file.masters ]
+  filename = "${path.module}/playbooks/vars/kubeadm_settings"
+  content = templatefile("${path.module}/templates/kubeadm.tmpl",{
+    ad_addr = digitalocean_droplet.masters.ipv4_address_private
+  })
 }
+
+resource "local_file" "workers" {
+  depends_on = [ digitalocean_droplet.workers ]
+  filename = "${path.module}/inventory/workers"
+  content = templatefile("${path.module}/templates/workers.tmpl",{
+    hostipmap = {
+      for key in digitalocean_droplet.workers.*: key.name => key.ipv4_address
+    }
+  })
+}
+
 
 resource "null_resource" "clusters" {
   depends_on = [
-    null_resource.masters,
-    null_resource.workers
+    local_file.masters,
+    local_file.kubeadm_settings,
+    local_file.workers
   ]
 
   provisioner "local-exec" {
