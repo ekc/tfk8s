@@ -12,7 +12,7 @@
     register: output
 
   - name: Initializing Kubernetes cluster
-    command: kubeadm init --apiserver-advertise-address {{ad_addr}} --pod-network-cidr={{cidr_v}} --cri-socket /var/run/dockershim.sock
+    command: kubeadm init --apiserver-advertise-address {{apiserver_advertise_address}} --pod-network-cidr={{pod_network_cidr}} --cri-socket /var/run/dockershim.sock
     register: output
 
   - name: Storing Logs and Generated token for future purpose.
@@ -32,8 +32,20 @@
       remote_src: yes
       mode: '0600'
 
-  - name: Install Network Add-on
+  - name: Set weave as the default network add-on
+    set_fact:
+      network_addon: "weave"
+    when: (network_addon is undefined) or (network_addon | length == 0) or (network_addon not in ["weave", "flannel"])
+
+  - name: Install Flannel Network Addon
     command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+    when: network_addon == "flannel"
+
+  - name: Install Weave Works Network Addon
+    shell:
+      cmd: kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+    when: network_addon == "weave"
+
 
   - name: Capture the output of kubectl completion bash
     command: kubectl completion bash

@@ -34,7 +34,9 @@ resource "local_file" "kubeadm_settings" {
   depends_on = [ digitalocean_droplet.masters, local_file.masters ]
   filename = "${path.module}/playbooks/vars/kubeadm_settings"
   content = templatefile("${path.module}/templates/kubeadm.tmpl",{
-    ad_addr = digitalocean_droplet.masters.ipv4_address_private
+    apiserver_advertise_address = digitalocean_droplet.masters.ipv4_address_private
+    pod_network_cidr = var.settings["pod_network_cidr"]
+    network_addon = var.settings["network_addon"]
   })
 }
 
