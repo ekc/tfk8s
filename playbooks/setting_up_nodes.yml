@@ -9,19 +9,19 @@
   - name: Enable SELinux in permissive mode
     block:
     - include_role:
-        name: rhel-system-roles.selinux
+        name: linux-system-roles.selinux
     rescue:
     # Fail if failed for a different reason than selinux_reboot_required
     - name: handle errors
       fail:
-        msg: rhel-system-roles.selinux failed
+        msg: linux-system-roles.selinux failed
       when: not selinux_reboot_required
     - name: restart the system
       reboot:
-        msg: "rhel-system-roles: the update requires reboot"
-    - name: reapply rhel-system-roles
+        msg: "linux-system-roles: the update requires reboot"
+    - name: reapply linux-system-roles
       include_role:
-        name: rhel-system-roles.selinux
+        name: linux-system-roles.selinux
 
   - name: Letting iptables see bridged traffic (1/2)
     copy:
