@@ -1,9 +1,12 @@
 ---
 - hosts: all
   become: yes
+  vars_files:
+  - vars/kubeadm_settings
   vars:
     selinux_policy: targeted
     selinux_state: permissive
+    crio_version: "1.24"
 
   tasks:
   - name: Enable SELinux in permissive mode
@@ -25,33 +28,21 @@
 
   - name: Letting iptables see bridged traffic (1/2)
     copy:
-      content: "br_netfilter"
+      content: |
+        overlay
+        br_netfilter
       dest: /etc/modules-load.d/k8s.conf
-    notify: Reload kernel parameters
+    notify: Add modules into the kernel
 
   - name: Letting iptables see bridged traffic (2/2)
     copy:
       content: |
+        net.bridge.bridge-nf-call-iptables  = 1
         net.bridge.bridge-nf-call-ip6tables = 1
-        net.bridge.bridge-nf-call-iptables = 1
+        net.ipv4.ip_forward                 = 1
       dest: /etc/sysctl.d/k8s.conf
     notify: Reload kernel parameters
 
-  - name: Remove obsoleted docker packages (installed from CentOS repo)
-    yum:
-      name: "{{ packages }}"
-      state: removed
-    vars:
-      packages:
-      - docker
-      - docker-client
-      - docker-client-latest
-      - docker-common
-      - docker-latest
-      - docker-latest-logrotate
-      - docker-logrotate
-      - docker-engine
-  
   - name: Install prerequisite packages
     yum:
         name: "{{ packages }}"
@@ -63,41 +54,44 @@
       - iproute-tc
       - bash-completion
   
-  - name: Add Docker repo
+  - name: Identify the latest CRI-O release (1/2)
+    uri:
+      url: https://api.github.com/repos/cri-o/cri-o/releases/latest
+      body_format: json
+      return_content: yes
+    register: crio_release_json
+
+  - name: Identify the latest CRI-O release (2/2)
+    set_fact:
+      crio_version_minor: "{{ crio_release_json.json.tag_name | regex_replace('^v(\\d+)\\.(\\d+).*','\\1.\\2') }}"
+
+
+  - name: Add cri-o repo (1/2)
     get_url:
-      url: https://download.docker.com/linux/centos/docker-ce.repo
-      dest: /etc/yum.repos.d/docker-ce.repo
+      url: https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/CentOS_8/devel:kubic:libcontainers:stable.repo
+      dest: /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo
 
-  - name: Create /etc/docker
-    file:
-      path: /etc/docker
-      state: directory
+  - name: Add cri-o repo (2/2)
+    get_url:
+      url: https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:{{ crio_version_minor }}/CentOS_8/devel:kubic:libcontainers:stable:cri-o:{{ crio_version_minor }}.repo
+      dest: /etc/yum.repos.d/devel:kubic:libcontainers:stable:cri-o:{{ crio_version_minor }}.repo
 
-  # By default, docker uses cgroupfs as cgroup driver and kubelet  uses systemd 
-  # https://github.com/kubernetes/kubeadm/issues/1394
-  # https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/
-  # https://kubernetes.io/docs/setup/production-environment/container-runtimes/#docker
-  - name: Let the docker service use systemd cgroup driver
-    copy:
-      content: |
-        {
-          "exec-opts": ["native.cgroupdriver=systemd"],
-          "log-driver": "json-file",
-          "log-opts": {
-            "max-size": "100m"
-          },
-          "storage-driver": "overlay2"
-        }
-      dest: /etc/docker/daemon.json
-    notify:
-      - Reload systemd units
-      - Restart and enable services
-
-  - name: Install docker
+  - name: Install CRI-O
     yum:
-      name: docker-ce
+      name: "{{ packages }}"
       state: latest
+      update_cache: yes
+    vars:
+      packages:
+      - cri-o
+      - cri-tools
     notify: Restart and enable services
+
+  - name: Override default CRI-O subnet
+    replace:
+      path: /etc/cni/net.d/100-crio-bridge.conf
+      regexp: '10\.85\.0\.0\/16'
+      replace: '{{ pod_network_cidr }}'
 
   - name: Adding repository details in Kubernetes repo file.
     copy:
@@ -130,6 +124,14 @@
     notify: Restart and enable services
   
   handlers:
+  - name: Add modules into the kernel
+    modprobe:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - br_netfilter
+      - overlay
+
   - name: Reload kernel parameters
     command: sysctl --system
 
@@ -143,5 +145,5 @@
       state: restarted
       enabled: yes
     loop:
-    - docker
+    - crio
     - kubelet

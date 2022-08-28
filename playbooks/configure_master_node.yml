@@ -12,7 +12,7 @@
     register: output
 
   - name: Initializing Kubernetes cluster
-    command: kubeadm init --apiserver-advertise-address {{apiserver_advertise_address}} --pod-network-cidr={{pod_network_cidr}} --cri-socket /var/run/dockershim.sock
+    command: kubeadm init --apiserver-advertise-address {{apiserver_advertise_address}} --pod-network-cidr={{pod_network_cidr}} --cri-socket unix:///var/run/crio/crio.sock
     register: output
 
   - name: Storing Logs and Generated token for future purpose.
