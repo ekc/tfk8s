@@ -30,13 +30,15 @@ resource "local_file" "masters" {
   })
 }
 
-resource "local_file" "kubeadm_settings" {
+resource "local_file" "cluster_settings" {
   depends_on = [ digitalocean_droplet.masters, local_file.masters ]
-  filename = "${path.module}/playbooks/vars/kubeadm_settings"
-  content = templatefile("${path.module}/templates/kubeadm.tmpl",{
+  filename = "${path.module}/playbooks/vars/cluster_settings"
+  content = templatefile("${path.module}/templates/cluster.tmpl",{
+    crio_version = var.settings["crio_version"]
     apiserver_advertise_address = digitalocean_droplet.masters.ipv4_address_private
     pod_network_cidr = var.settings["pod_network_cidr"]
     network_addon = var.settings["network_addon"]
+    current_datetime = timestamp()
   })
 }
 
@@ -54,7 +56,7 @@ resource "local_file" "workers" {
 resource "null_resource" "clusters" {
   depends_on = [
     local_file.masters,
-    local_file.kubeadm_settings,
+    local_file.cluster_settings,
     local_file.workers
   ]
 

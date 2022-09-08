@@ -1,8 +1,9 @@
 variable "settings" {
-  type = object({ region=string, image=string, master_size=string, worker_size=string, number_of_workers=number, ssh_keys=list(number), pod_network_cidr=string, network_addon=string})
+  type = object({ region=string, image=string, crio_version=string, master_size=string, worker_size=string, number_of_workers=number, ssh_keys=list(number), pod_network_cidr=string, network_addon=string})
   default = {
     region = "sfo3"
     image = "centos-8-x64"
+    crio_version = "latest"
     master_size = "s-1vcpu-2gb"
     worker_size = "s-1vcpu-2gb"
     number_of_workers = 2

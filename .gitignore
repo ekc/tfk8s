@@ -101,8 +101,8 @@ join_token
 **/inventory/masters
 **/inventory/workers
 
-### Ignore kubeadm-settings varible file ###
+### Ignore cluster_settings varible file ###
 ### Because it is created from terraform template ###
-**/playbooks/vars/kubeadm_settings
+**/playbooks/vars/cluster_settings
 
 # End of https://www.toptal.com/developers/gitignore/api/terraform,ansible,vim,visualstudiocode,git

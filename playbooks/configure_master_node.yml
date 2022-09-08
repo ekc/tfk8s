@@ -2,7 +2,7 @@
 - hosts: masters
   become: yes
   vars_files:
-  - vars/kubeadm_settings
+  - vars/cluster_settings
   tasks:
   - name: Pulling images required for setting up a Kubernetes cluster
     command: kubeadm config images pull

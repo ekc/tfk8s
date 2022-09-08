@@ -2,11 +2,10 @@
 - hosts: all
   become: yes
   vars_files:
-  - vars/kubeadm_settings
+  - vars/cluster_settings
   vars:
     selinux_policy: targeted
     selinux_state: permissive
-    crio_version: "1.24"
 
   tasks:
   - name: Enable SELinux in permissive mode
@@ -63,8 +62,18 @@
 
   - name: Identify the latest CRI-O release (2/2)
     set_fact:
-      crio_version_minor: "{{ crio_release_json.json.tag_name | regex_replace('^v(\\d+)\\.(\\d+).*','\\1.\\2') }}"
+      latest_crio_version_minor: "{{ crio_release_json.json.tag_name | regex_replace('^v(\\d+)\\.(\\d+).*','\\1.\\2') }}"
 
+  - name: Override string latest with actual latest version string
+    set_fact:
+      crio_version: "{{ latest_crio_version_minor }}"
+    when: 
+      - crio_version is defined
+      - crio_version | lower == "latest"
+
+  - name: Determine the version of CRI-O to install
+    set_fact:
+      crio_version_minor: "{{ crio_version | default(latest_crio_version_minor, true) }}"
 
   - name: Add cri-o repo (1/2)
     get_url:

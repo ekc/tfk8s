@@ -2,7 +2,7 @@
 - hosts: workers
   become: yes
   vars_files:
-  - vars/kubeadm_settings
+  - vars/cluster_settings
   tasks:
   - name: Copying token to worker nodes
     copy: src={{ token_file }} dest=join_token
