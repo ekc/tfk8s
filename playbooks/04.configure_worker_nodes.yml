@@ -1,6 +1,7 @@
 ---
 - hosts: workers
   become: yes
+  gather_facts: no
   vars_files:
   - vars/cluster_settings
   tasks:

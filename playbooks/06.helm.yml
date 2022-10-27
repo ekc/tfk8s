@@ -1,0 +1,12 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+  vars_files:
+  - vars/cluster_settings
+  vars: ~
+
+  tasks:
+  - name: Install Helm
+    shell:
+      cmd: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash

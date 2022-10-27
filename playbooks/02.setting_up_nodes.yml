@@ -6,6 +6,32 @@
   vars:
     selinux_policy: targeted
     selinux_state: permissive
+    # https://istio.io/latest/docs/setup/platform-setup/prerequisites/
+    istio_prereq_modules:
+      - ip6table_mangle
+      - ip6table_nat
+      - ip6table_raw
+      - iptable_mangle
+      - iptable_nat
+      - iptable_raw
+      - xt_REDIRECT
+      - xt_connmark
+      - xt_conntrack
+      - xt_mark
+      - xt_owner
+      - xt_tcpudp
+      - bridge
+      - ip6_tables
+      - ip_tables
+      - nf_conntrack
+      # - nf_conntrack_ipv4
+      # - nf_conntrack_ipv6
+      - nf_nat
+      # - nf_nat_ipv4
+      # - nf_nat_ipv6
+      # - nf_nat_redirect
+      - x_tables
+      - iptable_filter
 
   tasks:
   - name: Enable SELinux in permissive mode
@@ -41,6 +67,13 @@
         net.ipv4.ip_forward                 = 1
       dest: /etc/sysctl.d/k8s.conf
     notify: Reload kernel parameters
+
+    # https://istio.io/latest/docs/setup/platform-setup/prerequisites/
+  - name: Load modules for istio
+    copy:
+      content: "{{ istio_prereq_modules | join('\n') }}"
+      dest: /etc/modules-load.d/istio.conf
+    notify: Add istio prerequisite modules into the kernel
 
   - name: Install prerequisite packages
     yum:
@@ -86,6 +119,7 @@
       dest: /etc/yum.repos.d/devel:kubic:libcontainers:stable:cri-o:{{ crio_version_minor }}.repo
 
   - name: Install CRI-O
+
     yum:
       name: "{{ packages }}"
       state: latest
@@ -131,6 +165,49 @@
       - kubeadm
       - kubectl
     notify: Restart and enable services
+
+  - name: Identify the latest flanneld (1/2)
+    uri:
+      url: https://api.github.com/repos/flannel-io/flannel/releases/latest
+      body_format: json
+      return_content: yes
+    register: flannel_release_json
+    when: network_addon == "flannel"
+
+  - name: Identify the latest flanneld (2/2)
+    set_fact:
+      latest_flannel_release: "{{ flannel_release_json.json.tag_name }}"
+    when: network_addon == "flannel"
+
+  - name: Download the latest flanneld
+    get_url:
+      url: "https://github.com/flannel-io/flannel/releases/download/{{ latest_flannel_release }}/flannel-{{ latest_flannel_release }}-linux-amd64.tar.gz"
+      dest: "/root"
+    when: network_addon == "flannel"
+
+  - name: Extract flanneld to /opt/bin
+    shell: |
+      mkdir -p /opt/bin
+      tar -xvzf /root/flannel-{{ latest_flannel_release }}-linux-amd64.tar.gz -C /opt/bin flanneld
+      chown root.root /opt/bin/flanneld
+
+  # https://github.com/kubernetes/kubernetes/issues/56850
+  - name: Enable cpu and memory accounting to fix cgroup issue#56850 (1/2)
+    file:
+      path: /etc/systemd/system/kubelet.service.d
+      state: directory
+
+  # https://github.com/kubernetes/kubernetes/issues/56850
+  - name: Enable cpu and memory accounting to fix cgroup issue#56850 (2/2)
+    copy:
+      content: |
+        [Service]
+        CPUAccounting=true
+        MemoryAccounting=true
+      dest: /etc/systemd/system/kubelet.service.d/11-cgroups.conf
+    notify:
+      - Reload systemd units
+      - Restart and enable services
   
   handlers:
   - name: Add modules into the kernel
@@ -140,6 +217,12 @@
     loop:
       - br_netfilter
       - overlay
+
+  - name: Add istio prerequisite modules into the kernel
+    modprobe:
+      name: "{{ item }}"
+      state: present
+    loop: "{{ istio_prereq_modules }}"
 
   - name: Reload kernel parameters
     command: sysctl --system

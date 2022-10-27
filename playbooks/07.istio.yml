@@ -1,0 +1,16 @@
+---
+- hosts: masters
+  become: yes
+  vars_files:
+  - vars/cluster_settings
+  vars: ~
+
+  tasks:
+  - name: "Install Istio"
+    shell: |
+      curl -L https://istio.io/downloadIstio | sh -
+      helm repo add istio https://istio-release.storage.googleapis.com/charts
+      helm repo update
+      kubectl create namespace istio-system
+      helm install istio-base istio/base -n istio-system
+      helm install istiod istio/istiod -n istio-system --wait

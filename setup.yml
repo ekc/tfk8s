@@ -1,5 +1,8 @@
 ---
-- import_playbook: playbooks/prerequisites.yml
-- import_playbook: playbooks/setting_up_nodes.yml
-- import_playbook: playbooks/configure_master_node.yml
-- import_playbook: playbooks/configure_worker_nodes.yml
+- import_playbook: playbooks/01.prerequisites.yml
+- import_playbook: playbooks/02.setting_up_nodes.yml
+- import_playbook: playbooks/03.configure_master_node.yml
+- import_playbook: playbooks/04.configure_worker_nodes.yml
+- import_playbook: playbooks/05.productivity_tools.yml
+- import_playbook: playbooks/06.helm.yml
+- import_playbook: playbooks/07.istio.yml

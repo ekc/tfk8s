@@ -1,6 +1,7 @@
 ---
 - hosts: masters
   become: yes
+  gather_facts: yes
   vars_files:
   - vars/cluster_settings
   tasks:
@@ -37,8 +38,21 @@
       network_addon: "weave"
     when: (network_addon is undefined) or (network_addon | length == 0) or (network_addon not in ["weave", "flannel"])
 
+  - name: Get the Flannel manifest
+    get_url:
+      url: https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+      dest: /root/kube-flannel.yml
+    when: network_addon == "flannel"
+
+  - name: Replace POD network CIDR in the Flannel manifest
+    replace:
+      path: /root/kube-flannel.yml
+      regexp: '10\.244\.0\.0\/16'
+      replace: '{{ pod_network_cidr }}'
+
   - name: Install Flannel Network Addon
-    command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+    #command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+    command: kubectl apply -f /root/kube-flannel.yml
     when: network_addon == "flannel"
 
   - name: Install Weave Works Network Addon
